@@ -92,6 +92,50 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<script>
+// RTS ProcMap web shell additions (inserted into the page head at export, see export_presets.cfg).
+// 1) Ask for the high-performance (dedicated) GPU on laptops with two GPUs.
+// 2) Record which GPU the browser actually gave us, for the in-game HUD.
+// 3) Replace the blocking "context lost" alert with a page that explains it and reloads.
+(function () {
+  window.procmapGpu = "unknown";
+  var orig = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, attrs) {
+    if (type === "webgl2" || type === "webgl" || type === "experimental-webgl") {
+      attrs = Object.assign({}, attrs || {}, { powerPreference: "high-performance" });
+      var ctx = orig.call(this, type, attrs);
+      if (ctx && window.procmapGpu === "unknown") {
+        try {
+          var ext = ctx.getExtension("WEBGL_debug_renderer_info");
+          window.procmapGpu = String(ext ? ctx.getParameter(ext.UNMASKED_RENDERER_WEBGL) : ctx.getParameter(ctx.RENDERER));
+        } catch (e) {}
+        this.addEventListener("webglcontextlost", function (ev) { showLost("The browser reset the graphics card connection (WebGL context lost)."); }, false);
+      }
+      return ctx;
+    }
+    return orig.apply(this, arguments);
+  };
+  var shown = false;
+  function showLost(reason) {
+    if (shown) return;
+    shown = true;
+    var d = document.createElement("div");
+    d.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(10,14,20,0.92);color:#e8eef2;font:16px/1.5 system-ui,sans-serif;padding:16px";
+    d.innerHTML = '<div style="max-width:560px"><h2 style="margin:0 0 8px">The game stopped</h2><p style="margin:0 0 8px">' + reason +
+      '</p><p style="margin:0 0 8px">This usually happens when the GPU runs out of memory or takes too long on a frame, often on integrated graphics. ' +
+      'Reloading keeps your seed and map size. If it keeps happening, pick a smaller map size, and make sure the browser uses the dedicated GPU (see the game\'s README).</p>' +
+      '<p style="margin:0 0 12px;opacity:.7">GPU: ' + window.procmapGpu.replace(/[<>&]/g, "") + '</p>' +
+      '<button style="font:inherit;padding:8px 18px;border-radius:6px;border:0;background:#3a8ee6;color:#fff;cursor:pointer" onclick="location.reload()">Reload</button></div>';
+    document.body.appendChild(d);
+  }
+  window.procmapShowLost = showLost;
+  var origAlert = window.alert;
+  window.alert = function (msg) {
+    if (String(msg).indexOf("context lost") >= 0) { showLost("The browser reset the graphics card connection (WebGL context lost)."); return; }
+    return origAlert.apply(window, arguments);
+  };
+})();
+</script>
 
 	</head>
 	<body>
@@ -111,7 +155,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":129636,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":132468,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
